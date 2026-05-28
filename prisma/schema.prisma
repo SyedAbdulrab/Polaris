@@ -1,0 +1,191 @@
+// Polaris — Prisma schema
+// A personal life-metrics tracker: finances, streaks, goals, mood logs.
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Enums ----------
+
+enum IncomeType {
+  SALARY
+  COMMISSION
+  PENSION
+  OTHER
+}
+
+enum Frequency {
+  ONE_TIME
+  WEEKLY
+  MONTHLY
+  ANNUAL
+}
+
+enum StreakType {
+  POSITIVE
+  NEGATIVE
+}
+
+// ---------- Core ----------
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String
+  name         String?
+
+  // Hashed refresh token for rotation. Null = logged out / never logged in.
+  refreshTokenHash String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  incomeSources    IncomeSource[]
+  expenses         Expense[]
+  goals            Goal[]
+  metricSnapshots  MetricSnapshot[]
+  streaks          Streak[]
+  logEntries       LogEntry[]
+
+  @@map("users")
+}
+
+// ---------- Money in ----------
+
+model IncomeSource {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  type      IncomeType
+  // Stored in minor units (e.g. cents) by convention via Decimal for precision.
+  amount    Decimal    @db.Decimal(14, 2)
+  frequency Frequency
+  startDate DateTime
+  endDate   DateTime?
+  isActive  Boolean    @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, isActive])
+  @@map("income_sources")
+}
+
+// ---------- Money out ----------
+
+model Expense {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  category  String
+  amount    Decimal   @db.Decimal(14, 2)
+  frequency Frequency
+  startDate DateTime
+  endDate   DateTime?
+  isActive  Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, isActive])
+  @@index([userId, category])
+  @@map("expenses")
+}
+
+// ---------- Goals ----------
+
+model Goal {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name          String
+  targetAmount  Decimal   @db.Decimal(14, 2)
+  currentAmount Decimal   @default(0) @db.Decimal(14, 2)
+  deadline      DateTime?
+  category      String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("goals")
+}
+
+// ---------- Computed metric history (for trend charts) ----------
+
+model MetricSnapshot {
+  id     String   @id @default(cuid())
+  userId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // The day this snapshot represents. We dedupe per (userId, date).
+  date         DateTime
+  projectedMRR Decimal  @db.Decimal(14, 2)
+  totalIncome  Decimal  @db.Decimal(14, 2)
+  totalExpenses Decimal @db.Decimal(14, 2)
+  // savingsRate is a fraction in [-1, 1], stored with 4 decimal precision.
+  savingsRate  Decimal  @db.Decimal(6, 4)
+  netCashFlow  Decimal  @db.Decimal(14, 2)
+  // Free-form bag for future metrics (best-case/worst-case scenarios, etc.)
+  customMetrics Json?
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("metric_snapshots")
+}
+
+// ---------- Streaks ----------
+
+model Streak {
+  id             String     @id @default(cuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name           String
+  type           StreakType
+  currentCount   Int        @default(0)
+  longestCount   Int        @default(0)
+  lastLoggedDate DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("streaks")
+}
+
+// ---------- Logs (highs / lows / mood / tagged check-ins) ----------
+
+model LogEntry {
+  id     String   @id @default(cuid())
+  userId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  date  DateTime
+  mood  Int?     // 1..5 or 1..10 — agreed at the API layer
+  note  String?
+  tags  Json?    // string[] e.g. ["high", "win", "ran-5k"]
+  // Optional numeric value (e.g. weight, hours-slept) when the entry tracks a number.
+  value Decimal? @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@map("log_entries")
+}

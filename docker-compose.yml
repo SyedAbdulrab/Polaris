@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: polaris-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: polaris
+      POSTGRES_PASSWORD: polaris
+      POSTGRES_DB: polaris
+    ports:
+      - "5432:5432"
+    volumes:
+      - polaris-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U polaris -d polaris"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: polaris-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - polaris-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    container_name: polaris-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://polaris:polaris@postgres:5432/polaris?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: change-me-access-in-prod
+      JWT_REFRESH_SECRET: change-me-refresh-in-prod
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      BCRYPT_ROUNDS: 10
+      THROTTLE_TTL: 60
+      THROTTLE_LIMIT: 120
+    ports:
+      - "3000:3000"
+
+volumes:
+  polaris-db:
+  polaris-redis:
