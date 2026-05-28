@@ -79,6 +79,25 @@ services:
     ports:
       - "3001:3001"
 
+  # Reverse proxy / TLS terminator. Phase 4 = HTTP only on :80.
+  # Phase 7 will add :443 + the SSL cert mount.
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: polaris-nginx
+    restart: unless-stopped
+    depends_on:
+      - api
+      - web
+    ports:
+      - "80:80"
+    volumes:
+      # Our virtual host configs. ":ro" = read-only, nginx can't accidentally write here.
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      # Shared volume for Let's Encrypt HTTP-01 challenge files (used in Phase 6).
+      # Empty for now — directory just needs to exist so the location block doesn't 404.
+      - certbot-webroot:/var/www/certbot:ro
+
 volumes:
   polaris-db:
   polaris-redis:
+  certbot-webroot:
