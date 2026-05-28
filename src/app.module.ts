@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
+import { AccountModule } from './account/account.module';
 import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -17,6 +18,7 @@ import { MetricsModule } from './metrics/metrics.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { StreakModule } from './streak/streak.module';
+import { TransactionModule } from './transaction/transaction.module';
 
 @Module({
   imports: [
@@ -41,6 +43,8 @@ import { StreakModule } from './streak/streak.module';
     StreakModule,
     LogModule,
     MetricsModule,
+    AccountModule,
+    TransactionModule,
     DashboardModule,
     ExportModule,
   ],

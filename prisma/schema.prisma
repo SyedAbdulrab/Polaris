@@ -32,6 +32,23 @@ enum StreakType {
   NEGATIVE
 }
 
+enum AccountKind {
+  CHECKING
+  SAVINGS
+  CASH
+  CREDIT_CARD
+  INVESTMENT
+  LOAN
+  OTHER
+}
+
+enum TransactionKind {
+  INFLOW
+  OUTFLOW
+  TRANSFER
+  ADJUSTMENT
+}
+
 // ---------- Core ----------
 
 model User {
@@ -52,6 +69,8 @@ model User {
   metricSnapshots  MetricSnapshot[]
   streaks          Streak[]
   logEntries       LogEntry[]
+  accounts         Account[]
+  transactions     Transaction[]
 
   @@map("users")
 }
@@ -75,6 +94,9 @@ model IncomeSource {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Real transactions that materialise this rule (e.g. May's actual paycheck).
+  transactions Transaction[]
+
   @@index([userId])
   @@index([userId, isActive])
   @@map("income_sources")
@@ -97,6 +119,8 @@ model Expense {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
 
   @@index([userId])
   @@index([userId, isActive])
@@ -188,4 +212,79 @@ model LogEntry {
 
   @@index([userId, date])
   @@map("log_entries")
+}
+
+// ---------- Accounts (real-world money buckets) ----------
+
+model Account {
+  id     String      @id @default(cuid())
+  userId String
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name           String
+  kind           AccountKind
+  // Each account stores values in its OWN native currency. Aggregation across
+  // accounts (e.g. net worth in display currency) happens client-side using FX rates.
+  currency       String      @db.VarChar(8)
+  // Optional bank/issuer label, free-form. e.g. "HBL", "Vanguard", "Apple Card".
+  institution    String?
+  openingBalance Decimal     @default(0) @db.Decimal(16, 2)
+  openingDate    DateTime
+  isActive       Boolean     @default(true)
+  archivedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Transactions that hit this account directly.
+  transactions     Transaction[] @relation("AccountTransactions")
+  // Transactions where this account is the *destination* of a transfer.
+  incomingTransfers Transaction[] @relation("AccountIncomingTransfers")
+
+  @@index([userId])
+  @@index([userId, isActive])
+  @@map("accounts")
+}
+
+// ---------- Transactions (actual money-moving events) ----------
+
+model Transaction {
+  id     String          @id @default(cuid())
+  userId String
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  accountId String
+  account   Account       @relation("AccountTransactions", fields: [accountId], references: [id], onDelete: Cascade)
+
+  date        DateTime
+  // Always positive. Direction is encoded by `kind`.
+  // Stored in the *account's* native currency.
+  amount      Decimal         @db.Decimal(16, 2)
+  kind        TransactionKind
+  // Free-form category, mirrors Expense.category for OUTFLOWs. For INFLOWs use
+  // tags like "salary", "freelance", "refund".
+  category    String?
+  description String?
+
+  // Optional links back to recurring rules so we can answer
+  // "did May's projected $5k salary actually hit?".
+  sourceIncomeId  String?
+  sourceIncome    IncomeSource? @relation(fields: [sourceIncomeId], references: [id], onDelete: SetNull)
+  sourceExpenseId String?
+  sourceExpense   Expense?      @relation(fields: [sourceExpenseId], references: [id], onDelete: SetNull)
+
+  // For TRANSFER transactions, the other side. The `amount` is debited from
+  // `account` and credited (in its own currency) to `transferToAccount` —
+  // cross-currency transfers track each side independently.
+  transferToAccountId String?
+  transferToAccount   Account? @relation("AccountIncomingTransfers", fields: [transferToAccountId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([accountId, date])
+  @@index([userId, sourceIncomeId])
+  @@index([userId, sourceExpenseId])
+  @@map("transactions")
 }
