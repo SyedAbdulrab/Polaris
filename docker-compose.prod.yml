@@ -62,8 +62,10 @@ services:
       BCRYPT_ROUNDS: 10
       THROTTLE_TTL: 60
       THROTTLE_LIMIT: 120
-    ports:
-      - "3000:3000"
+    # No published ports — the API is reachable only via nginx on the internal
+    # docker network (nginx → api:3000). Closed to the public internet.
+    expose:
+      - "3000"
 
   web:
     build:
@@ -76,8 +78,9 @@ services:
     restart: unless-stopped
     depends_on:
       - api
-    ports:
-      - "3001:3001"
+    # No published ports — reachable only via nginx (nginx → web:3001).
+    expose:
+      - "3001"
 
   # Reverse proxy / TLS terminator. Phase 4 = HTTP only on :80.
   # Phase 7 will add :443 + the SSL cert mount.

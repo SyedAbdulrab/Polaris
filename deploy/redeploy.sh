@@ -35,8 +35,17 @@ WEB_DIR="${WEB_DIR:-$HOME/polaris-web}"
 COMPOSE_FILE="$POLARIS_DIR/docker-compose.prod.yml"
 ENV_FILE="$POLARIS_DIR/.env.prod"
 
-# Healthcheck — we hit the API from inside the box (avoids security-group surprises).
-HEALTH_URL="http://localhost:3000/health"
+# Healthcheck — hit the API through nginx over HTTPS, exercising the full
+# real path (TLS termination + host-based routing + proxy → api:3000).
+#
+# We force the connection to 127.0.0.1 via curl --resolve instead of letting
+# DNS send us to the public IP: an EC2 reaching its OWN public IP usually fails
+# (NAT loopback / hairpinning isn't supported at the Internet Gateway). Routing
+# to 127.0.0.1:443 hits the host-published nginx port, while SNI + Host stay
+# api.abdulrab.store so nginx picks the right server block and the cert matches.
+HEALTH_HOST="api.abdulrab.store"
+HEALTH_URL="https://${HEALTH_HOST}/health"
+HEALTH_RESOLVE="${HEALTH_HOST}:443:127.0.0.1"
 HEALTH_TIMEOUT_SECONDS=60
 
 # ---------- helpers ----------
@@ -89,7 +98,7 @@ step "Waiting for the API to come up"
 
 deadline=$(( $(date +%s) + HEALTH_TIMEOUT_SECONDS ))
 while :; do
-  if curl --silent --fail "$HEALTH_URL" >/dev/null; then
+  if curl --silent --fail --resolve "$HEALTH_RESOLVE" "$HEALTH_URL" >/dev/null; then
     echo "✓ /health responded OK"
     break
   fi
