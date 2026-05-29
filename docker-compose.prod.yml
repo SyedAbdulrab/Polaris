@@ -90,6 +90,7 @@ services:
       - web
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       # Our virtual host configs. ":ro" = read-only, nginx can't accidentally write here.
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
