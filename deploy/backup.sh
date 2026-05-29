@@ -90,11 +90,14 @@ aws s3 cp "$tmp" "$dest" --only-show-errors \
 
 # ---------- confirm it landed ----------
 
-# Verify via list-objects-v2 (needs s3:ListBucket), NOT head-object: HeadObject
-# requires s3:GetObject, which the role deliberately lacks (append-only design).
-# Listing returns the object's size without reading its contents.
-remote_size="$(aws s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "$key" \
-  --query 'Contents[0].Size' --output text 2>/dev/null || echo missing)"
+# Verify with the HIGH-level `aws s3 ls` rather than low-level `aws s3api`:
+#   - it uses s3:ListBucket (which the role has), NOT s3:GetObject (which it
+#     deliberately lacks — so head-object is out), and
+#   - high-level `aws s3` auto-resolves the bucket's region, while `aws s3api`
+#     would hit the default-region endpoint and error if they differ.
+# Output columns: <date> <time> <size> <key> — we want column 3.
+remote_size="$(aws s3 ls "s3://${BACKUP_BUCKET}/${key}" 2>/dev/null | awk '{print $3}' | head -1)"
+remote_size="${remote_size:-missing}"
 [ "$remote_size" = "$size" ] \
   || die "post-upload size mismatch (local ${size}, remote ${remote_size})"
 
