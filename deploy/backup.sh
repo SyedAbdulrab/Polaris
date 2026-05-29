@@ -90,8 +90,11 @@ aws s3 cp "$tmp" "$dest" --only-show-errors \
 
 # ---------- confirm it landed ----------
 
-remote_size="$(aws s3api head-object --bucket "$BACKUP_BUCKET" --key "$key" \
-  --query 'ContentLength' --output text 2>/dev/null || echo missing)"
+# Verify via list-objects-v2 (needs s3:ListBucket), NOT head-object: HeadObject
+# requires s3:GetObject, which the role deliberately lacks (append-only design).
+# Listing returns the object's size without reading its contents.
+remote_size="$(aws s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix "$key" \
+  --query 'Contents[0].Size' --output text 2>/dev/null || echo missing)"
 [ "$remote_size" = "$size" ] \
   || die "post-upload size mismatch (local ${size}, remote ${remote_size})"
 
