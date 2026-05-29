@@ -121,8 +121,79 @@ services:
     entrypoint: /bin/sh
     command: -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
 
+  # ─────────────────────────── Observability stack ──────────────────────────
+  # Prometheus scrapes /metrics from the API + the exporters below, stores the
+  # time series, and Grafana visualizes them. All internal — only Grafana is
+  # ever exposed publicly (via nginx, in a later phase).
+
+  # Time-series DB + scraper.
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: polaris-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d" # keep 15 days of history
+    expose:
+      - "9090"
+
+  # Host metrics: CPU, RAM, disk, network of the EC2 box itself.
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: polaris-node-exporter
+    restart: unless-stopped
+    command:
+      - "--path.rootfs=/host"
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    expose:
+      - "9100"
+
+  # Per-container metrics: CPU/mem/network of each docker container.
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: polaris-cadvisor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    expose:
+      - "8080"
+
+  # Dashboards. Datasource + dashboards are provisioned from ./grafana on boot.
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: polaris-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env.prod}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Public URL — used to build correct links. Set once the subdomain exists.
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://grafana.abdulrab.store}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    expose:
+      - "3000"
+
 volumes:
   polaris-db:
   polaris-redis:
   certbot-webroot:
   letsencrypt:
+  prometheus-data:
+  grafana-data:

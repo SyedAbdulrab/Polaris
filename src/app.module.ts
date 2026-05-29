@@ -16,6 +16,7 @@ import { HealthModule } from './health/health.module';
 import { IncomeModule } from './income/income.module';
 import { LogModule } from './log/log.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { ObservabilityModule } from './observability/observability.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { StreakModule } from './streak/streak.module';
@@ -47,6 +48,7 @@ import { TransactionModule } from './transaction/transaction.module';
     StreakModule,
     LogModule,
     MetricsModule,
+    ObservabilityModule,
     AccountModule,
     TransactionModule,
     DashboardModule,

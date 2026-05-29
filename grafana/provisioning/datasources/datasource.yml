@@ -1,0 +1,14 @@
+# Auto-provisions the Prometheus data source on Grafana startup, so you never
+# click through the UI to wire it up. The fixed `uid` lets our dashboard JSON
+# reference this data source reliably.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    # Reached over the internal docker network (Grafana → prometheus:9090).
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
