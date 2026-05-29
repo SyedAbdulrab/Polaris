@@ -103,7 +103,7 @@ while :; do
   if [ "$(date +%s)" -ge "$deadline" ]; then
     echo "✗ /health did not respond within ${HEALTH_TIMEOUT_SECONDS}s"
     echo "--- last 60 lines of api logs ---"
-    docker compose -f "$COMPOSE_FILE" logs --tail=60 api || true
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" logs --tail=60 api || true
     exit 1
   fi
   printf '.'
