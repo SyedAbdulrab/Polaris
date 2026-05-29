@@ -20,7 +20,7 @@ terraform {
   # be a literal. Create the bucket out-of-band first (chicken-and-egg), then
   # run `terraform init -migrate-state` to move local state up here.
   backend "s3" {
-    bucket = "REPLACE_WITH_YOUR_STATE_BUCKET" # e.g. polaris-tfstate-1a2b3c4d
+    bucket = "polaris-tfstate-5070a4e8"
     key    = "polaris/terraform.tfstate"      # path of the state object within the bucket
     region = "eu-north-1"
     encrypt      = true                        # encrypt the state object at rest
