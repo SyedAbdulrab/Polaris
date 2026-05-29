@@ -47,30 +47,6 @@ resource "aws_security_group" "polaris" {
       security_groups  = []
       self             = false
     },
-    # STALE: API direct port — no longer published on the host. Remove next apply.
-    {
-      description      = "Polaris API"
-      from_port        = 3000
-      to_port          = 3000
-      protocol         = "tcp"
-      cidr_blocks      = ["0.0.0.0/0"]
-      ipv6_cidr_blocks = []
-      prefix_list_ids  = []
-      security_groups  = []
-      self             = false
-    },
-    # STALE: frontend direct port — no longer published on the host. Remove next apply.
-    {
-      description      = "Polaris frontend"
-      from_port        = 3001
-      to_port          = 3001
-      protocol         = "tcp"
-      cidr_blocks      = ["0.0.0.0/0"]
-      ipv6_cidr_blocks = []
-      prefix_list_ids  = []
-      security_groups  = []
-      self             = false
-    },
   ]
 
   egress = [
