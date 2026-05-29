@@ -63,6 +63,9 @@ services:
       BCRYPT_ROUNDS: 10
       THROTTLE_TTL: 60
       THROTTLE_LIMIT: 120
+      # Sentry error tracking. If SENTRY_DSN is unset, the SDK is a silent no-op.
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
     # No published ports — the API is reachable only via nginx on the internal
     # docker network (nginx → api:3000). Closed to the public internet.
     expose:

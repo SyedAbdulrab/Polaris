@@ -13,4 +13,11 @@ export class AppController {
       health: '/health',
     };
   }
+
+  // TEMPORARY: throws on purpose so we can confirm Sentry is capturing errors.
+  // Hit GET /api/debug-sentry once, verify the event in Sentry, then remove this.
+  @Get('debug-sentry')
+  debugSentry() {
+    throw new Error('Polaris Sentry test error — capture is working!');
+  }
 }

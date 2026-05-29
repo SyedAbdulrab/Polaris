@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { SentryGlobalFilter, SentryModule } from '@sentry/nestjs/setup';
 
 import { AccountModule } from './account/account.module';
 import { AppController } from './app.controller';
@@ -22,6 +23,9 @@ import { TransactionModule } from './transaction/transaction.module';
 
 @Module({
   imports: [
+    // Sentry's NestJS integration. Pairs with src/instrument.ts (which does the
+    // actual Sentry.init). This wires Sentry into Nest's request lifecycle.
+    SentryModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
@@ -49,6 +53,12 @@ import { TransactionModule } from './transaction/transaction.module';
     ExportModule,
   ],
   controllers: [AppController],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    // Reports any unhandled exception that reaches Nest's exception layer to
+    // Sentry, then lets normal handling continue. Must be registered before any
+    // other exception filter (we have none, so it's the catch-all).
+    { provide: APP_FILTER, useClass: SentryGlobalFilter },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

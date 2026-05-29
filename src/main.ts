@@ -1,3 +1,7 @@
+// MUST be first — initializes Sentry before any other module loads so it can
+// instrument HTTP/Express/Postgres. Do not move this below other imports.
+import './instrument';
+
 import { RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
