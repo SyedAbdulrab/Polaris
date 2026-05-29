@@ -1,10 +1,9 @@
 # Security group protecting the Polaris EC2 instance.
 # Imported from the console-created "EUN-TEST1-SG" (an AWS launch-wizard default).
 #
-# NOTE: this matches CURRENT reality exactly (so the import is a 0-change apply).
-# The 3000/3001 ingress rules are stale — after nginx+TLS the containers use
-# `expose` not host `ports`, so nothing listens there. We remove them in a
-# follow-up apply as a deliberate, reviewable security tightening.
+# Inbound is intentionally minimal: SSH (22) for deploys, and HTTP/HTTPS (80/443)
+# for nginx. The old direct-to-container ports (3000/3001) were removed via
+# Terraform once nginx+TLS made them dead attack surface.
 resource "aws_security_group" "polaris" {
   name        = "EUN-TEST1-SG"
   description = "launch-wizard-1 created 2026-05-26T10:42:36.124Z"
