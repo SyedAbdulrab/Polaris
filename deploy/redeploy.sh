@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Polaris redeploy — pulls latest code for both repos, rebuilds, restarts, verifies.
+# Polaris redeploy — pulls latest config + prebuilt GHCR images, restarts, verifies.
 #
 # Designed to be:
 #   - idempotent: running it twice in a row should be a no-op
@@ -27,9 +27,10 @@ fi
 
 # ---------- config ----------
 
-# Where the two repos live. Adjust if your layout differs.
+# Only the polaris repo is needed on the VM now — it holds the compose file,
+# nginx config, and these scripts. The app images (api + web) are prebuilt in
+# CI and pulled from GHCR, so polaris-web no longer needs to live here.
 POLARIS_DIR="${POLARIS_DIR:-$HOME/polaris}"
-WEB_DIR="${WEB_DIR:-$HOME/polaris-web}"
 
 # Which compose file orchestrates production.
 COMPOSE_FILE="$POLARIS_DIR/docker-compose.prod.yml"
@@ -66,31 +67,28 @@ require() {
 step "Preflight"
 
 [ -d "$POLARIS_DIR/.git" ] || { echo "✗ $POLARIS_DIR is not a git repo"; exit 1; }
-[ -d "$WEB_DIR/.git" ]     || { echo "✗ $WEB_DIR is not a git repo";     exit 1; }
 [ -f "$COMPOSE_FILE" ]     || { echo "✗ missing $COMPOSE_FILE"; exit 1; }
 [ -f "$ENV_FILE" ]         || { echo "✗ missing $ENV_FILE — production secrets not set up"; exit 1; }
 
-echo "✓ both repos present, compose + env in place"
+echo "✓ repo present, compose + env in place"
 
-# ---------- pull ----------
+# ---------- pull latest config ----------
 
-step "Pulling latest code"
+step "Pulling latest config (compose, nginx, scripts)"
 
 (cd "$POLARIS_DIR" && git fetch --quiet && git pull --ff-only)
-(cd "$WEB_DIR"     && git fetch --quiet && git pull --ff-only)
+config_sha=$(cd "$POLARIS_DIR" && git rev-parse --short HEAD)
+echo "  polaris config → $config_sha"
 
-# Print the SHAs we're about to deploy so the CI log shows exactly what shipped.
-api_sha=$(cd "$POLARIS_DIR" && git rev-parse --short HEAD)
-web_sha=$(cd "$WEB_DIR"     && git rev-parse --short HEAD)
-echo "  polaris      → $api_sha"
-echo "  polaris-web  → $web_sha"
+# ---------- pull images + bring up ----------
 
-# ---------- build + bring up ----------
-
-step "Building & restarting containers"
+step "Pulling images from GHCR & restarting containers"
 
 cd "$POLARIS_DIR"
-require docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
+# Pull the app images (api + web) defined in the compose file. Requires a prior
+# one-time `docker login ghcr.io` on this box (read:packages token).
+require docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" pull
+require docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
 
 # ---------- verify ----------
 
@@ -118,4 +116,4 @@ step "Cleaning up dangling images"
 
 docker image prune -f >/dev/null
 
-step "Deploy complete · api=$api_sha · web=$web_sha"
+step "Deploy complete · config=$config_sha · images pulled from GHCR"

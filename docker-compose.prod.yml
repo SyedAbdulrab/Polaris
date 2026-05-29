@@ -41,8 +41,9 @@ services:
       retries: 10
 
   api:
-    build:
-      context: .
+    # Prebuilt image from GHCR (built + pushed by polaris/.github/workflows/build.yml).
+    # Override the tag for rollback, e.g. API_IMAGE_TAG=sha-4c57604 in .env.prod.
+    image: ghcr.io/syedabdulrab/polaris-api:${API_IMAGE_TAG:-latest}
     container_name: polaris-api
     restart: unless-stopped
     depends_on:
@@ -68,12 +69,10 @@ services:
       - "3000"
 
   web:
-    build:
-      context: ../polaris-web
-      args:
-        # NEXT_PUBLIC_API_URL must be set at BUILD time, not runtime — Next.js inlines it
-        # into the JS bundle. Change the IP / domain → rebuild the web image.
-        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+    # Prebuilt image from GHCR (built + pushed by polaris-web/.github/workflows/build.yml).
+    # NEXT_PUBLIC_API_URL is already baked into this image at CI build time.
+    # Override the tag for rollback, e.g. WEB_IMAGE_TAG=sha-abc1234 in .env.prod.
+    image: ghcr.io/syedabdulrab/polaris-web:${WEB_IMAGE_TAG:-latest}
     container_name: polaris-web
     restart: unless-stopped
     depends_on:
