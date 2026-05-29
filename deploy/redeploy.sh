@@ -47,7 +47,10 @@ ENV_FILE="$POLARIS_DIR/.env.prod"
 HEALTH_HOST="api.abdulrab.store"
 HEALTH_URL="https://${HEALTH_HOST}/health"
 HEALTH_RESOLVE="${HEALTH_HOST}:443:127.0.0.1"
-HEALTH_TIMEOUT_SECONDS=60
+# Generous because a cold deploy on the t3.micro now boots ~10 containers
+# (api, web, postgres, redis, nginx, certbot, prometheus, grafana, node-exporter,
+# cadvisor) plus runs migrations — all competing for one vCPU. 60s was too tight.
+HEALTH_TIMEOUT_SECONDS=120
 
 # ---------- helpers ----------
 

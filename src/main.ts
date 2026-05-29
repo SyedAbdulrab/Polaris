@@ -7,9 +7,11 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Request, Response } from 'express';
 import helmet from 'helmet';
 
 import { AppModule } from './app.module';
+import { MetricsService } from './observability/metrics.service';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
@@ -33,7 +35,6 @@ async function bootstrap() {
     exclude: [
       { path: '/', method: RequestMethod.GET },
       { path: 'health', method: RequestMethod.GET },
-      { path: 'metrics', method: RequestMethod.GET },
     ],
   });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
@@ -47,6 +48,16 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swagger);
   // Spec wants /api/docs explicitly.
   SwaggerModule.setup('api/docs', app, document);
+
+  // Prometheus scrape endpoint. Registered straight on the Express instance so it
+  // lives at a bare `/metrics` — outside the `/api` prefix, URI versioning, global
+  // guards and the business `MetricsController` (which owns `/api/metrics`). nginx
+  // 404s this path publicly; Prometheus reaches it internally over the docker net.
+  const metricsService = app.get(MetricsService);
+  app.getHttpAdapter().getInstance().get('/metrics', async (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', metricsService.contentType());
+    res.send(await metricsService.metrics());
+  });
 
   const port = Number(config.get('PORT')) || 3000;
   await app.listen(port, '0.0.0.0');
