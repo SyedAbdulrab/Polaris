@@ -1,0 +1,22 @@
+# Terraform — what to keep OUT of git.
+
+# Provider plugins + local cache (huge, machine-specific, re-downloaded by `init`).
+.terraform/
+
+# STATE: never commit. It maps your code to real resource IDs and can contain
+# secrets (passwords, keys) in plaintext. Belongs in remote state (T6), not git.
+*.tfstate
+*.tfstate.*
+
+# Variable files often hold secrets/account-specific values.
+*.tfvars
+*.tfvars.json
+
+# Crash logs and local overrides.
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+
+# NOTE: .terraform.lock.hcl is intentionally NOT ignored — you SHOULD commit it.
+# It pins exact provider versions/hashes so everyone gets identical plugins.
