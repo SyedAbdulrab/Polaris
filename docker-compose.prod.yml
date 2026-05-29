@@ -93,11 +93,30 @@ services:
     volumes:
       # Our virtual host configs. ":ro" = read-only, nginx can't accidentally write here.
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      # Shared volume for Let's Encrypt HTTP-01 challenge files (used in Phase 6).
-      # Empty for now — directory just needs to exist so the location block doesn't 404.
+      # Shared volume for Let's Encrypt HTTP-01 challenge files.
+      # certbot writes tokens here, nginx serves them.
       - certbot-webroot:/var/www/certbot:ro
+      # Issued certificates. certbot writes them, nginx reads them in Phase 7.
+      - letsencrypt:/etc/letsencrypt:ro
+
+  # ACME client. Two modes:
+  #   - Initial issuance: run as a one-off →
+  #       docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm certbot <args>
+  #   - Renewal: the long-running command below loops `certbot renew` every 12h.
+  # On first `up` it will try to renew (no certs yet → no-op) then sleep.
+  certbot:
+    image: certbot/certbot:latest
+    container_name: polaris-certbot
+    restart: unless-stopped
+    volumes:
+      # Same two shared volumes as nginx, but read-WRITE here — certbot owns the writes.
+      - certbot-webroot:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+    entrypoint: /bin/sh
+    command: -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
 
 volumes:
   polaris-db:
   polaris-redis:
   certbot-webroot:
+  letsencrypt:
